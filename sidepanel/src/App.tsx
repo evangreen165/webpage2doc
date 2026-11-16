@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Languages, Moon, Sun } from "lucide-react";
+import { FileDown, Languages, Moon, Sun } from "lucide-react";
+import { collectFromTab } from "./lib/bridge";
+import type { Snapshot } from "./lib/types";
 
 type Theme = "light" | "dark";
+type JobStatus = "idle" | "collecting" | "done" | "error";
 
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -16,7 +19,7 @@ function useTheme(): [Theme, () => void] {
     localStorage.setItem("w2d.theme", theme);
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === "dark" ? "light" : "dark"));
+  const toggleTheme = () => setTheme((current) => (current === "dark" ? "light" : "dark"));
   return [theme, toggleTheme];
 }
 
@@ -61,13 +64,84 @@ function Header() {
   );
 }
 
+const ERROR_KEYS: Record<string, string> = {
+  UNSUPPORTED_PAGE: "errors.unsupported",
+  TIMEOUT: "errors.timeout",
+  EMPTY: "errors.empty",
+};
+
 export default function App() {
   const { t } = useTranslation();
+  const tt = (key: string) => t(key as never);
+  const [status, setStatus] = useState<JobStatus>("idle");
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [error, setError] = useState("");
+
+  const generate = async () => {
+    setStatus("collecting");
+    setSnapshot(null);
+    setError("");
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id) {
+        setError(tt("errors.noTab"));
+        setStatus("error");
+        return;
+      }
+      const snap = await collectFromTab(tab.id);
+      if (!snap.ok) {
+        setError(tt(ERROR_KEYS[snap.error?.code ?? "UNKNOWN"] ?? "errors.generic"));
+        setStatus("error");
+        return;
+      }
+      setSnapshot(snap);
+      setStatus("done");
+    } catch {
+      setError(tt("errors.generic"));
+      setStatus("error");
+    }
+  };
+
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <Header />
-      <main className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-        <p className="text-sm text-muted-foreground">{t("app.tagline")}</p>
+      <main className="flex flex-1 flex-col gap-4 p-4">
+        <button
+          type="button"
+          onClick={generate}
+          disabled={status === "collecting"}
+          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          <FileDown className="h-4 w-4" />
+          {t("actions.generate")}
+        </button>
+
+        {status === "collecting" && <p className="text-sm text-muted-foreground">{t("status.collecting")}</p>}
+
+        {status === "error" && <p className="text-sm font-medium text-red-500">{error}</p>}
+
+        {status === "done" && snapshot && (
+          <div className="flex flex-col gap-3">
+            <h2 className="truncate text-sm font-semibold" title={snapshot.title}>
+              {snapshot.title}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {t("results.found", { images: snapshot.images.length, videos: snapshot.videos.length })}
+            </p>
+            {snapshot.warnings.length > 0 && (
+              <div className="flex flex-col gap-1 rounded-md border p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide">{t("results.warnings")}</p>
+                <ul className="flex flex-col gap-1">
+                  {snapshot.warnings.map((warning) => (
+                    <li key={warning} className="text-xs text-muted-foreground">
+                      {warning}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
       </main>
     </div>
   );

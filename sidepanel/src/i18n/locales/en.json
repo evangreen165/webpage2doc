@@ -9,5 +9,22 @@
   },
   "lang": {
     "switch": "Switch language"
+  },
+  "actions": {
+    "generate": "Generate"
+  },
+  "status": {
+    "collecting": "Collecting the page…"
+  },
+  "results": {
+    "found": "Found: {{images}} images, {{videos}} videos",
+    "warnings": "Warnings:"
+  },
+  "errors": {
+    "noTab": "No active tab available.",
+    "unsupported": "This page is not supported. The extension only works on regular web pages (http/https).",
+    "timeout": "Could not collect the page in time.",
+    "empty": "The page is empty or did not respond.",
+    "generic": "Could not collect the page."
   }
 }
