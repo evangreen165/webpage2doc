@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "WebPage2Doc",
+  "version": "0.1.0",
+  "description": "Any web page to clean PDF, DOCX or Markdown. Images included, clutter removed.",
+  "minimum_chrome_version": "114",
+  "permissions": ["sidePanel", "downloads", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background/service-worker.js" },
+  "action": {
+    "default_title": "WebPage2Doc",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  },
+  "side_panel": { "default_path": "sidepanel/index.html" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content/content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+}

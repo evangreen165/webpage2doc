@@ -1,0 +1,13 @@
+{
+  "app": {
+    "name": "WebPage2Doc",
+    "tagline": "Open a page, click the icon and save it as PDF, DOCX or Markdown."
+  },
+  "theme": {
+    "light": "Light theme",
+    "dark": "Dark theme"
+  },
+  "lang": {
+    "switch": "Switch language"
+  }
+}
