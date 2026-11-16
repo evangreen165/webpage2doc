@@ -1,0 +1,24 @@
+# WebPage2Doc
+
+> Chrome extension (Manifest V3) that turns any web page into PDF, DOCX or Markdown with images. Local-first: everything runs in the browser, no backend. Side panel UI in React, content extraction via @mozilla/readability.
+
+## Docs
+- [README (RU)](https://github.com/evangreen165/webpage2doc/blob/main/README.md): overview, install (Load unpacked), usage
+- [README (EN)](https://github.com/evangreen165/webpage2doc/blob/main/README.en.md)
+- [Architecture](https://github.com/evangreen165/webpage2doc/blob/main/docs/ARCHITECTURE.md): message flow, rendering, failure modes
+- [Decisions](https://github.com/evangreen165/webpage2doc/blob/main/docs/DECISIONS.md): ADR log
+
+## Capabilities
+- Outputs: PDF (html2pdf.js), DOCX (docx), Markdown (turndown)
+- Images: <img src>, data-src, srcset, CSS background-image -> images/ folder in ZIP
+- Video: <video>/<iframe> -> "[Видео: url]" link, never downloaded
+- Extraction: @mozilla/readability strips menus, banners, footers
+- Limits: 200 images, 100 MB, ~50 PDF pages; SSRF is not applicable (no network egress besides the page)
+- UI: side panel, RU/EN, dark theme, staged progress, 10-item localStorage history
+
+## Interfaces
+- chrome.tabs -> W2D_COLLECT message -> Snapshot (title, url, html, images[], videos[], warnings[])
+- chrome.downloads.download(blob:...) -> webpage2doc/<slug>.<format>.zip
+
+## License
+MIT. @mozilla/readability is MPL-2.0 (file-level, compatible).
