@@ -64,40 +64,33 @@ function Header() {
   );
 }
 
-const ERROR_KEYS: Record<string, string> = {
-  UNSUPPORTED_PAGE: "errors.unsupported",
-  TIMEOUT: "errors.timeout",
-  EMPTY: "errors.empty",
-};
-
 export default function App() {
   const { t } = useTranslation();
-  const tt = (key: string) => t(key as never);
   const [status, setStatus] = useState<JobStatus>("idle");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState<string | null>(null);
 
   const generate = async () => {
     setStatus("collecting");
     setSnapshot(null);
-    setError("");
+    setErrorCode(null);
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) {
-        setError(tt("errors.noTab"));
+        setErrorCode("NO_TAB");
         setStatus("error");
         return;
       }
       const snap = await collectFromTab(tab.id);
       if (!snap.ok) {
-        setError(tt(ERROR_KEYS[snap.error?.code ?? "UNKNOWN"] ?? "errors.generic"));
+        setErrorCode(snap.error?.code ?? "GENERIC");
         setStatus("error");
         return;
       }
       setSnapshot(snap);
       setStatus("done");
     } catch {
-      setError(tt("errors.generic"));
+      setErrorCode("GENERIC");
       setStatus("error");
     }
   };
@@ -118,7 +111,9 @@ export default function App() {
 
         {status === "collecting" && <p className="text-sm text-muted-foreground">{t("status.collecting")}</p>}
 
-        {status === "error" && <p className="text-sm font-medium text-red-500">{error}</p>}
+        {status === "error" && errorCode && (
+          <p className="text-sm font-medium text-red-500">{t(`errors.${errorCode}` as never)}</p>
+        )}
 
         {status === "done" && snapshot && (
           <div className="flex flex-col gap-3">
