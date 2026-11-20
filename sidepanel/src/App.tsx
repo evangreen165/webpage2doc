@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { FileDown, Languages, Moon, Sun } from "lucide-react";
 import { collectFromTab } from "./lib/bridge";
+import { extractCleanHtml, type ExtractionResult } from "./lib/extractor";
 import type { Snapshot } from "./lib/types";
+import { PreviewPane } from "./components/PreviewPane";
 
 type Theme = "light" | "dark";
 type JobStatus = "idle" | "collecting" | "done" | "error";
@@ -68,11 +70,13 @@ export default function App() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<JobStatus>("idle");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [clean, setClean] = useState<ExtractionResult | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
 
   const generate = async () => {
     setStatus("collecting");
     setSnapshot(null);
+    setClean(null);
     setErrorCode(null);
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -88,6 +92,7 @@ export default function App() {
         return;
       }
       setSnapshot(snap);
+      setClean(extractCleanHtml(snap));
       setStatus("done");
     } catch {
       setErrorCode("GENERIC");
@@ -98,7 +103,7 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <Header />
-      <main className="flex flex-1 flex-col gap-4 p-4">
+      <main className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden p-4">
         <button
           type="button"
           onClick={generate}
@@ -115,26 +120,35 @@ export default function App() {
           <p className="text-sm font-medium text-red-500">{t(`errors.${errorCode}` as never)}</p>
         )}
 
-        {status === "done" && snapshot && (
-          <div className="flex flex-col gap-3">
-            <h2 className="truncate text-sm font-semibold" title={snapshot.title}>
-              {snapshot.title}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {t("results.found", { images: snapshot.images.length, videos: snapshot.videos.length })}
-            </p>
-            {snapshot.warnings.length > 0 && (
-              <div className="flex flex-col gap-1 rounded-md border p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide">{t("results.warnings")}</p>
-                <ul className="flex flex-col gap-1">
-                  {snapshot.warnings.map((warning) => (
-                    <li key={warning} className="text-xs text-muted-foreground">
-                      {warning}
-                    </li>
-                  ))}
-                </ul>
+        {status === "done" && snapshot && clean && (
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex flex-col gap-3">
+              <h2 className="truncate text-sm font-semibold" title={snapshot.title}>
+                {snapshot.title}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {t("results.found", { images: snapshot.images.length, videos: snapshot.videos.length })}
+              </p>
+              {(snapshot.warnings.length > 0 || clean.usedFallback) && (
+                <div className="flex flex-col gap-1 rounded-md border p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide">{t("results.warnings")}</p>
+                  <ul className="flex flex-col gap-1">
+                    {clean.usedFallback && <li className="text-xs text-muted-foreground">{t("warnings.partialContent")}</li>}
+                    {snapshot.warnings.map((warning) => (
+                      <li key={warning} className="text-xs text-muted-foreground">
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("preview.title")}</p>
+              <div className="min-h-0 flex-1">
+                <PreviewPane html={clean.html} />
               </div>
-            )}
+            </div>
           </div>
         )}
       </main>

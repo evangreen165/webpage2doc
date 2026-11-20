@@ -20,6 +20,12 @@
     "found": "Found: {{images}} images, {{videos}} videos",
     "warnings": "Warnings:"
   },
+  "warnings": {
+    "partialContent": "Some content may have been lost: the page was saved as-is (fallback)."
+  },
+  "preview": {
+    "title": "Preview"
+  },
   "errors": {
     "NO_TAB": "No active tab available.",
     "UNSUPPORTED_PAGE": "This page is not supported. The extension only works on regular web pages (http/https).",
