@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "description": "Any web page to clean PDF, DOCX or Markdown. Images included, clutter removed.",
   "minimum_chrome_version": "114",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'unsafe-inline' 'unsafe-eval'; object-src 'self'"
+  },
   "permissions": ["sidePanel", "downloads", "storage", "scripting"],
   "host_permissions": ["<all_urls>"],
   "background": { "service_worker": "background/service-worker.js" },

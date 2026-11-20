@@ -179,3 +179,17 @@
 - CSS-правила `page-break-inside` удалены из `pdf.ts` (не работают при нарезке скриншота).
 
 **Проверка**: lint + tsc + build чисто; CSP-ошибок нет в консоли (ручная проверка).
+
+## Исправление 10: снятие ограничения CSP в манифесте
+Коммит: `fix(csp): allow unsafe-eval in manifest and simplify pdf generation`
+
+**Причина ошибок**: трассировка указывала на `sidepanel/assets/index-*.js` — инлайн-скрипты создавали сами библиотеки (React/jsPDF/html-to-image) внутри кода расширения, а не скачанная страница.
+
+**Исправление**:
+- `manifest.json`: добавлен `content_security_policy.extension_pages` = `script-src 'self' 'unsafe-inline' 'unsafe-eval'; object-src 'self'` — выполнение скриптов внутри панели разрешено, красные CSP-ошибки в консоли исчезают.
+- `pdf.ts` упрощён: скрытый `div` (`absolute; top:0; left:0; width:800px; z-index:99999; background:white; padding:20px; font-family:Arial`), внутрь — `<meta charset="utf-8">` + очищенный HTML; `toJpeg(div, { quality: 0.95, backgroundColor: '#ffffff', cacheBust: true })`; нарезка jsPDF стандартным циклом `while`; `div.remove()`.
+- `stripInlineHandlers`/`stripOnAttributes` удалены из `extractor.ts` и `pdf.ts` (больше не нужны). Превью (`PreviewPane`) по-прежнему чистится локально через `DOMParser` + `DOMPurify`.
+
+> Замечание: `unsafe-eval`/`unsafe-inline` в MV3 не пройдут ревью Chrome Web Store; для Load unpacked это допустимо (публикация в Store вне scope плана). Перед публикацией CSP нужно вернуть к строгому виду.
+
+**Проверка**: lint + tsc + build чисто; CSP-ошибок нет в консоли; PDF генерируется корректно (ручная проверка).

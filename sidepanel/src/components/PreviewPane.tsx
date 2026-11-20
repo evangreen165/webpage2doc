@@ -1,5 +1,4 @@
 import DOMPurify from "dompurify";
-import { stripInlineHandlers } from "../lib/extractor";
 
 type PreviewPaneProps = {
   html: string;
@@ -11,7 +10,16 @@ const PREVIEW_PURIFY_CONFIG = {
 };
 
 function cleanPreview(html: string): string {
-  return DOMPurify.sanitize(stripInlineHandlers(html), PREVIEW_PURIFY_CONFIG);
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("*").forEach((el) => {
+    for (const attr of [...el.attributes]) {
+      if (attr.name.toLowerCase().startsWith("on")) {
+        el.removeAttribute(attr.name);
+      }
+    }
+    if (el.tagName === "SCRIPT") el.remove();
+  });
+  return DOMPurify.sanitize(doc.body.innerHTML, PREVIEW_PURIFY_CONFIG);
 }
 
 export function PreviewPane({ html }: PreviewPaneProps) {
