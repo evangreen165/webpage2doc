@@ -59,9 +59,23 @@ export function stripInlineHandlers(html: string): string {
   return doc.body.innerHTML;
 }
 
-export function extractCleanHtml(snapshot: Pick<Snapshot, "html">): ExtractionResult {
+export function extractCleanHtml(snapshot: Snapshot): ExtractionResult {
   const doc = new DOMParser().parseFromString(snapshot.html, "text/html");
   promoteLazyImages(doc);
+
+  const idByUrl = new Map(snapshot.images.map((candidate) => [candidate.url, candidate.id]));
+  doc.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src");
+    if (!src) return;
+    let absolute: string | null = null;
+    try {
+      absolute = new URL(src, snapshot.url).href;
+    } catch {
+      return;
+    }
+    const id = idByUrl.get(absolute);
+    if (id) img.setAttribute("data-w2d-id", id);
+  });
 
   const article = new Readability(doc.cloneNode(true) as Document).parse();
 

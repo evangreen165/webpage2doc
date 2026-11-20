@@ -57,3 +57,15 @@
 - i18n: ключ `options.zip` в `ru.json`/`en.json`.
 
 **Проверка**: lint + tsc + build чисто; в PDF/DOCX картинки видны; оба режима скачивания работают (ручная проверка).
+
+## Исправление 2: надёжное сопоставление картинок по `data-w2d-id` + PNG для DOCX
+Коммит: `fix(render): map images by data-id, convert to png for docx, add dom paint delay for pdf`
+
+**Проблема**: сопоставление скачанных картинок с `<img>` по URL ненадёжно — в `outerHTML` атрибуты `src` хранятся в относительном виде, и после парсинга в панели они не совпадают с абсолютными URL кандидатов. Также `docx` не поддерживает WebP/AVIF.
+
+**Исправление**:
+- `extractor.ts`: `extractCleanHtml(snapshot)` — каждому `<img>` присваивается `data-w2d-id` (id кандидата `img-0001`…), сопоставление через резолв `src` относительно `snapshot.url` → абсолютный URL → id.
+- `docx.ts`: картинки ищутся по `data-w2d-id`; `convertToPng(base64)` — `new Image()` → canvas → `toDataURL('image/png')` (гарантированный формат); в `ImageRun.data` передаётся PNG как `Uint8Array` (`atob` + charCodeAt).
+- `pdf.ts`: `src` подменяется на сохранённый Base64 по `data-w2d-id`; перед `toJpeg` добавлены `await document.fonts.ready` + `await new Promise(r => setTimeout(r, 1000))` (DOM успевает отрисовать Base64), плюс ожидание `img.complete`/`onload`/`onerror`.
+
+**Проверка**: lint + tsc + build чисто; картинки в PDF/DOCX не битые (ручная проверка).

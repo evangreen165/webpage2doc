@@ -24,18 +24,44 @@ const HEADING_LEVELS: Record<string, (typeof HeadingLevel)[keyof typeof HeadingL
   h6: HeadingLevel.HEADING_6,
 };
 
-type InlineCtx = { bold?: boolean; italic?: boolean; images: Map<string, DownloadedImage>; sizes: Map<string, { width: number; height: number }> };
+type PreparedImage = { pngDataUrl: string; width: number; height: number };
+
+type InlineCtx = {
+  bold?: boolean;
+  italic?: boolean;
+  imagesById: Map<string, PreparedImage>;
+};
 
 const MAX_IMAGE_WIDTH_PX = 640;
 
-function base64ToUint8Array(dataUrl: string): Uint8Array {
+function dataUrlToUint8Array(dataUrl: string): Uint8Array {
   const base64 = dataUrl.split(",")[1] ?? dataUrl;
   const binary = atob(base64);
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
-function imageTypeOf(blob: Blob): "png" | "jpg" {
-  return blob.type.includes("png") ? "png" : "jpg";
+async function loadImage(dataUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = dataUrl;
+  });
+}
+
+async function convertToPng(base64: string): Promise<PreparedImage> {
+  const img = await loadImage(base64);
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas 2d context unavailable");
+  ctx.drawImage(img, 0, 0);
+  return {
+    pngDataUrl: canvas.toDataURL("image/png"),
+    width: canvas.width,
+    height: canvas.height,
+  };
 }
 
 function inlineRuns(node: Node, ctx: InlineCtx): (TextRun | ImageRun)[] {
@@ -55,20 +81,19 @@ function inlineRuns(node: Node, ctx: InlineCtx): (TextRun | ImageRun)[] {
       return;
     }
     if (tag === "img") {
-      const src = el.getAttribute("src") ?? "";
-      const downloaded = ctx.images.get(src);
-      const size = ctx.sizes.get(src);
-      if (downloaded && size) {
-        let width = size.width;
-        let height = size.height;
+      const id = el.getAttribute("data-w2d-id") ?? "";
+      const prepared = ctx.imagesById.get(id);
+      if (prepared) {
+        let width = prepared.width;
+        let height = prepared.height;
         if (width > MAX_IMAGE_WIDTH_PX) {
           height = Math.round((height * MAX_IMAGE_WIDTH_PX) / width);
           width = MAX_IMAGE_WIDTH_PX;
         }
         runs.push(
           new ImageRun({
-            type: imageTypeOf(downloaded.blob),
-            data: base64ToUint8Array(downloaded.base64),
+            type: "png",
+            data: dataUrlToUint8Array(prepared.pngDataUrl),
             transformation: { width, height },
           }),
         );
@@ -190,10 +215,8 @@ function walkBlocks(container: Node, ctx: InlineCtx, out: Block[]): void {
       return;
     }
     if (tag === "img") {
-      const src = el.getAttribute("src") ?? "";
-      const downloaded = ctx.images.get(src);
-      const size = ctx.sizes.get(src);
-      if (downloaded && size) {
+      const id = el.getAttribute("data-w2d-id") ?? "";
+      if (ctx.imagesById.has(id)) {
         out.push(new Paragraph({ children: inlineRuns(el, ctx), spacing: { after: 120 } }));
       } else {
         out.push(new Paragraph({ children: [new TextRun({ text: "[Картинка]" })] }));
@@ -205,28 +228,29 @@ function walkBlocks(container: Node, ctx: InlineCtx, out: Block[]): void {
   });
 }
 
-function imageSize(dataUrl: string): Promise<{ width: number; height: number } | null> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve({ width: img.naturalWidth || 1, height: img.naturalHeight || 1 });
-    img.onerror = () => resolve(null);
-    img.src = dataUrl;
-  });
-}
-
 export async function renderDocx(html: string, images: DownloadedImage[]): Promise<Blob> {
-  const imagesByUrl = new Map(images.map((img) => [img.url, img]));
-  const sizes = new Map<string, { width: number; height: number }>();
+  const imagesById = new Map(images.map((img) => [img.id, img]));
+  const doc = new DOMParser().parseFromString(html, "text/html");
+
+  const preparedById = new Map<string, PreparedImage>();
+  const seen = new Set<string>();
   await Promise.all(
-    images.map(async (img) => {
-      const size = await imageSize(img.base64);
-      if (size) sizes.set(img.url, size);
+    Array.from(doc.querySelectorAll("img")).map(async (img) => {
+      const id = img.getAttribute("data-w2d-id") ?? "";
+      if (!id || seen.has(id)) return;
+      const downloaded = imagesById.get(id);
+      if (!downloaded) return;
+      seen.add(id);
+      try {
+        preparedById.set(id, await convertToPng(downloaded.base64));
+      } catch {
+        // conversion failed → fall back to placeholder
+      }
     }),
   );
 
-  const doc = new DOMParser().parseFromString(html, "text/html");
   const blocks: Block[] = [];
-  const ctx: InlineCtx = { images: imagesByUrl, sizes };
+  const ctx: InlineCtx = { imagesById: preparedById };
   if (doc.body) walkBlocks(doc.body, ctx, blocks);
 
   const document = new Document({

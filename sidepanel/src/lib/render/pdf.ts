@@ -18,11 +18,11 @@ function bodyHtmlOf(fullHtml: string): string {
 }
 
 export async function renderPdf(html: string, images: DownloadedImage[]): Promise<Blob> {
-  const base64ByUrl = new Map(images.map((img) => [img.url, img.base64]));
+  const base64ById = new Map(images.map((img) => [img.id, img.base64]));
   const contentDoc = new DOMParser().parseFromString(bodyHtmlOf(html), "text/html");
   contentDoc.querySelectorAll("img").forEach((img) => {
-    const src = img.getAttribute("src") ?? "";
-    const dataUrl = base64ByUrl.get(src);
+    const id = img.getAttribute("data-w2d-id") ?? "";
+    const dataUrl = base64ById.get(id);
     if (dataUrl) img.setAttribute("src", dataUrl);
   });
 
@@ -50,6 +50,8 @@ export async function renderPdf(html: string, images: DownloadedImage[]): Promis
         });
       }),
     );
+    await document.fonts.ready;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     const dataUrl = await toJpeg(host, {
       quality: 0.95,
