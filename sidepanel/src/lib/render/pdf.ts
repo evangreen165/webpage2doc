@@ -1,4 +1,5 @@
-import html2pdf from "html2pdf.js";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 
 const PRINT_CSS = `
 @page { size: A4; margin: 10mm; }
@@ -12,6 +13,13 @@ pre { white-space: pre-wrap; font-family: "Courier New", monospace; }
 a { color: #111111; }
 `;
 
+const PAGE_WIDTH_MM = 210;
+const PAGE_HEIGHT_MM = 297;
+const MARGIN_MM = 10;
+const CONTENT_WIDTH_MM = PAGE_WIDTH_MM - MARGIN_MM * 2;
+const CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - MARGIN_MM * 2;
+const SCALE = 2;
+
 function bodyHtmlOf(fullHtml: string): string {
   const doc = new DOMParser().parseFromString(fullHtml, "text/html");
   return doc.body?.innerHTML ?? fullHtml;
@@ -20,8 +28,8 @@ function bodyHtmlOf(fullHtml: string): string {
 export async function renderPdf(html: string): Promise<Blob> {
   const host = document.createElement("div");
   host.id = "w2d-pdf-host";
-  host.style.position = "fixed";
-  host.style.left = "-10000px";
+  host.style.position = "absolute";
+  host.style.left = "-9999px";
   host.style.top = "0";
   host.style.width = "800px";
   host.style.background = "#ffffff";
@@ -29,18 +37,34 @@ export async function renderPdf(html: string): Promise<Blob> {
   document.body.appendChild(host);
 
   try {
-    const worker = html2pdf()
-      .set({
-        margin: 10,
-        filename: "document.pdf",
-        image: { type: "jpeg", quality: 0.95 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff", windowWidth: 800 },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css", "legacy"], avoid: ["h1", "h2", "h3", "table", "img"] },
-      })
-      .from(host);
+    const canvas = await html2canvas(host, {
+      scale: SCALE,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      windowWidth: 800,
+      logging: false,
+    });
 
-    return (await worker.outputPdf("blob")) as Blob;
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+
+    const imageWidthMm = CONTENT_WIDTH_MM;
+    const imageHeightMm = (canvas.height / canvas.width) * imageWidthMm;
+    const imageData = canvas.toDataURL("image/jpeg", 0.95);
+
+    let heightLeft = imageHeightMm;
+    let position = 0;
+
+    pdf.addImage(imageData, "JPEG", MARGIN_MM, MARGIN_MM + position, imageWidthMm, imageHeightMm);
+    heightLeft -= CONTENT_HEIGHT_MM;
+
+    while (heightLeft > 0) {
+      position -= CONTENT_HEIGHT_MM;
+      pdf.addPage();
+      pdf.addImage(imageData, "JPEG", MARGIN_MM, MARGIN_MM + position, imageWidthMm, imageHeightMm);
+      heightLeft -= CONTENT_HEIGHT_MM;
+    }
+
+    return pdf.output("blob");
   } finally {
     host.remove();
   }
