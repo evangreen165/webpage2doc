@@ -1,6 +1,7 @@
 import { toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
 import { stripInlineHandlers } from "../extractor";
+import type { DownloadedImage } from "../downloadImages";
 
 const BASE_STYLE = `
 img { max-width: 100%; height: auto; }
@@ -16,7 +17,15 @@ function bodyHtmlOf(fullHtml: string): string {
   return doc.body?.innerHTML ?? fullHtml;
 }
 
-export async function renderPdf(html: string): Promise<Blob> {
+export async function renderPdf(html: string, images: DownloadedImage[]): Promise<Blob> {
+  const base64ByUrl = new Map(images.map((img) => [img.url, img.base64]));
+  const contentDoc = new DOMParser().parseFromString(bodyHtmlOf(html), "text/html");
+  contentDoc.querySelectorAll("img").forEach((img) => {
+    const src = img.getAttribute("src") ?? "";
+    const dataUrl = base64ByUrl.get(src);
+    if (dataUrl) img.setAttribute("src", dataUrl);
+  });
+
   const host = document.createElement("div");
   host.style.position = "absolute";
   host.style.top = "0";
@@ -27,7 +36,7 @@ export async function renderPdf(html: string): Promise<Blob> {
   host.style.padding = "20px";
   host.style.color = "black";
   host.style.fontFamily = "Arial, sans-serif";
-  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${stripInlineHandlers(bodyHtmlOf(html))}`;
+  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${stripInlineHandlers(contentDoc.body.innerHTML)}`;
   document.body.appendChild(host);
 
   try {

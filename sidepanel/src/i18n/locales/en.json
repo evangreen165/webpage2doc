@@ -29,7 +29,10 @@
     "warnings": "Warnings:"
   },
   "warnings": {
-    "partialContent": "Some content may have been lost: the page was saved as-is (fallback)."
+    "partialContent": "Some content may have been lost: the page was saved as-is (fallback).",
+    "imageLimitReached": "Image limit reached (200): the rest were skipped.",
+    "imageFetchFailed": "Some images could not be downloaded (403/404) — alt text was kept in the document.",
+    "imageTooLarge": "Image skipped: size limit exceeded (100 MB)."
   },
   "preview": {
     "title": "Preview"

@@ -8,6 +8,8 @@ import { PreviewPane } from "./components/PreviewPane";
 import { renderMarkdown } from "./lib/render/markdown";
 import { renderDocx } from "./lib/render/docx";
 import { renderPdf } from "./lib/render/pdf";
+import { downloadImages } from "./lib/downloadImages";
+import { createZip } from "./lib/zip";
 import { slugify } from "./lib/format";
 
 type Theme = "light" | "dark";
@@ -71,6 +73,12 @@ function Header() {
   );
 }
 
+const WARNING_KEYS: Record<string, string> = {
+  image_limit_reached: "warnings.imageLimitReached",
+  image_fetch_failed: "warnings.imageFetchFailed",
+  image_too_large: "warnings.imageTooLarge",
+};
+
 export default function App() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<JobStatus>("idle");
@@ -79,11 +87,13 @@ export default function App() {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [format, setFormat] = useState<Format>("pdf");
   const [rendering, setRendering] = useState(false);
+  const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
 
   const generate = async () => {
     setStatus("collecting");
     setSnapshot(null);
     setClean(null);
+    setDownloadWarnings([]);
     setErrorCode(null);
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -110,19 +120,30 @@ export default function App() {
   const download = async () => {
     if (!clean || !snapshot) return;
     setRendering(true);
+    setDownloadWarnings([]);
     try {
-      let blob: Blob;
+      const { images, warnings } = await downloadImages(snapshot.images);
+      setDownloadWarnings(warnings);
+
+      let documentBlob: Blob;
+      const ext = format === "md" ? "md" : format;
       if (format === "md") {
-        blob = new Blob([renderMarkdown(clean.html)], { type: "text/markdown;charset=utf-8" });
+        documentBlob = new Blob([renderMarkdown(clean.html, images)], { type: "text/markdown;charset=utf-8" });
       } else if (format === "docx") {
-        blob = await renderDocx(clean.html);
+        documentBlob = await renderDocx(clean.html, images);
       } else {
-        blob = await renderPdf(clean.html);
+        documentBlob = await renderPdf(clean.html, images);
       }
-      const url = URL.createObjectURL(blob);
+
+      const zipBlob = await createZip([
+        { path: `document.${ext}`, blob: documentBlob },
+        ...images.map((img) => ({ path: `images/${img.filename}`, blob: img.blob })),
+      ]);
+
+      const url = URL.createObjectURL(zipBlob);
       await chrome.downloads.download({
         url,
-        filename: `webpage2doc/${slugify(snapshot.title)}.${format}`,
+        filename: `webpage2doc/${slugify(snapshot.title)}.zip`,
         saveAs: true,
       });
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -186,7 +207,7 @@ export default function App() {
                 </button>
               </div>
               {rendering && <p className="text-sm text-muted-foreground">{t("status.rendering")}</p>}
-              {(snapshot.warnings.length > 0 || clean.usedFallback) && (
+              {(snapshot.warnings.length > 0 || clean.usedFallback || downloadWarnings.length > 0) && (
                 <div className="flex flex-col gap-1 rounded-md border p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide">{t("results.warnings")}</p>
                   <ul className="flex flex-col gap-1">
@@ -194,6 +215,11 @@ export default function App() {
                     {snapshot.warnings.map((warning) => (
                       <li key={warning} className="text-xs text-muted-foreground">
                         {warning}
+                      </li>
+                    ))}
+                    {downloadWarnings.map((warning) => (
+                      <li key={warning} className="text-xs text-muted-foreground">
+                        {t((WARNING_KEYS[warning] ?? "errors.generic") as never)}
                       </li>
                     ))}
                   </ul>
