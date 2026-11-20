@@ -150,3 +150,18 @@
 - `pdf.ts`: в `toJpeg` добавлены `cacheBust: true` и `imagePlaceholder: ""` — внешние картинки подгружаются для визуальной проверки (до замены на локальные в Этапе 5).
 
 **Проверка**: lint + tsc + build чисто; CSP-ошибок в консоли нет; PDF с читаемым текстом и картинками (ручная проверка).
+
+## Исправление 8: очистка `on*` на уровне живого DOM + CSS-переносы
+Коммит: `fix(csp): strip on* from live dom and add page-break css`
+
+**Проблемы**:
+- CSP-ошибки оставались, т.к. браузер парсил `on*`-атрибуты из строки `innerHTML` раньше, чем мы их удаляли из строки.
+- Текст и картинки разрезались пополам на границах страниц.
+
+**Исправление**:
+- `extractor.ts`: рефакторинг — общая функция `stripOnAttributes(root)`, работающая с **живым DOM** (`ParentNode`); `stripInlineHandlers(html)` использует её.
+- `pdf.ts`: после `div.innerHTML = ...` сразу вызывается `stripOnAttributes(div)` — все `on*`-атрибуты удаляются из живого DOM-узла **до** `toJpeg`, браузер не успевает их «выполнить» при парсинге.
+- `PreviewPane.tsx`: перед `srcDoc` HTML парсится через `DOMParser`, `stripOnAttributes(doc)` вырезает все `on*`, затем `DOMPurify.sanitize` (script/style запрещены) — превью тоже чистое.
+- `pdf.ts` CSS: добавлено `img, figure, p, h1–h6, blockquote { page-break-inside: avoid; break-inside: avoid }` — блоки не разрываются (html-to-image может учитывать правила при расчёте высоты).
+
+**Проверка**: lint + tsc + build чисто; CSP-ошибок нет; разрывы страниц без разрезания блоков (ручная проверка).
