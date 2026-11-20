@@ -40,3 +40,20 @@
 - В MD ссылки `images/img-0001.png`; в PDF/DOCX картинки встроены.
 - Страница с битыми картинками → документ создаётся с warnings.
 - Повторные URL не дублируются (хэш SHA-256).
+
+## Исправление: картинки в PDF/DOCX + опция «без ZIP»
+Коммит: `fix(render): fix docx image binary, await pdf image load, add zip toggle`
+
+**Проблемы**:
+- `docx` (`ImageRun`) не принимал строку с префиксом `data:image/...;base64,` → картинки пустые.
+- `html-to-image` снимал скриншот до отрисовки Base64-картинок → пустые места в PDF.
+
+**Исправление**:
+- `docx.ts`: `base64ToUint8Array(dataUrl)` — отрезается префикс до запятой, `atob()` + `Uint8Array.from(binary, c => c.charCodeAt(0))`; в `ImageRun.data` передаётся именно `Uint8Array`.
+- `pdf.ts`: после замены `src` на Base64 и вставки в скрытый `div` ожидается загрузка всех `<img>` (`img.complete` → resolve; иначе `onload`/`onerror` → resolve) и только затем `toJpeg`.
+- `App.tsx`: чекбокс «Скачивать в ZIP (с папкой картинок)» — **по умолчанию выключен**:
+  - ВЫКЛ: скачивается только документ (`.pdf`/`.docx`/`.md`) напрямую через `chrome.downloads.download`, картинки для PDF/DOCX встроены внутрь;
+  - ВКЛ: документ + `images/` упаковываются в ZIP (как раньше).
+- i18n: ключ `options.zip` в `ru.json`/`en.json`.
+
+**Проверка**: lint + tsc + build чисто; в PDF/DOCX картинки видны; оба режима скачивания работают (ручная проверка).

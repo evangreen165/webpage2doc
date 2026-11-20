@@ -86,6 +86,7 @@ export default function App() {
   const [clean, setClean] = useState<ExtractionResult | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [format, setFormat] = useState<Format>("pdf");
+  const [zipEnabled, setZipEnabled] = useState(false);
   const [rendering, setRendering] = useState(false);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
 
@@ -135,15 +136,22 @@ export default function App() {
         documentBlob = await renderPdf(clean.html, images);
       }
 
-      const zipBlob = await createZip([
-        { path: `document.${ext}`, blob: documentBlob },
-        ...images.map((img) => ({ path: `images/${img.filename}`, blob: img.blob })),
-      ]);
+      let blobToDownload = documentBlob;
+      let filename: string;
+      if (zipEnabled) {
+        blobToDownload = await createZip([
+          { path: `document.${ext}`, blob: documentBlob },
+          ...images.map((img) => ({ path: `images/${img.filename}`, blob: img.blob })),
+        ]);
+        filename = `webpage2doc/${slugify(snapshot.title)}.zip`;
+      } else {
+        filename = `webpage2doc/${slugify(snapshot.title)}.${ext}`;
+      }
 
-      const url = URL.createObjectURL(zipBlob);
+      const url = URL.createObjectURL(blobToDownload);
       await chrome.downloads.download({
         url,
-        filename: `webpage2doc/${slugify(snapshot.title)}.zip`,
+        filename,
         saveAs: true,
       });
       setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -195,6 +203,15 @@ export default function App() {
                     <option value="docx">{t("format.docx")}</option>
                     <option value="md">{t("format.md")}</option>
                   </select>
+                </label>
+                <label className="flex items-center gap-1.5 text-xs font-medium">
+                  <input
+                    type="checkbox"
+                    checked={zipEnabled}
+                    onChange={(event) => setZipEnabled(event.target.checked)}
+                    className="h-3.5 w-3.5"
+                  />
+                  {t("options.zip")}
                 </label>
                 <button
                   type="button"

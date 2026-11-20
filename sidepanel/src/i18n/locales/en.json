@@ -37,6 +37,9 @@
   "preview": {
     "title": "Preview"
   },
+  "options": {
+    "zip": "Download as ZIP (with images folder)"
+  },
   "errors": {
     "NO_TAB": "No active tab available.",
     "UNSUPPORTED_PAGE": "This page is not supported. The extension only works on regular web pages (http/https).",

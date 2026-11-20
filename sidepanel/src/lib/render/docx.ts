@@ -28,8 +28,10 @@ type InlineCtx = { bold?: boolean; italic?: boolean; images: Map<string, Downloa
 
 const MAX_IMAGE_WIDTH_PX = 640;
 
-function base64Of(dataUrl: string): string {
-  return dataUrl.split(",")[1] ?? dataUrl;
+function base64ToUint8Array(dataUrl: string): Uint8Array {
+  const base64 = dataUrl.split(",")[1] ?? dataUrl;
+  const binary = atob(base64);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 function imageTypeOf(blob: Blob): "png" | "jpg" {
@@ -66,7 +68,7 @@ function inlineRuns(node: Node, ctx: InlineCtx): (TextRun | ImageRun)[] {
         runs.push(
           new ImageRun({
             type: imageTypeOf(downloaded.blob),
-            data: base64Of(downloaded.base64),
+            data: base64ToUint8Array(downloaded.base64),
             transformation: { width, height },
           }),
         );

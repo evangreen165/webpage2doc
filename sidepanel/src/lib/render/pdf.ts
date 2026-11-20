@@ -40,7 +40,16 @@ export async function renderPdf(html: string, images: DownloadedImage[]): Promis
   document.body.appendChild(host);
 
   try {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    const images = Array.from(host.querySelectorAll("img"));
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) return Promise.resolve();
+        return new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+      }),
+    );
 
     const dataUrl = await toJpeg(host, {
       quality: 0.95,
