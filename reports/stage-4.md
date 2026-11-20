@@ -138,3 +138,15 @@
 - `PreviewPane.tsx`: HTML перед `srcDoc` прогоняется через `DOMPurify.sanitize(html, { FORBID_TAGS: ['script','style'], FORBID_ATTR: ['onerror','onload','onclick'] })` — любые inline-события гарантированно удаляются из превью.
 
 **Проверка**: lint + tsc + build чисто; PDF непустой, кириллица корректная; CSP-ошибок нет (ручная проверка).
+
+## Исправление 7: жёсткая зачистка inline `on*`-атрибутов
+Коммит: `fix(csp): strictly remove all inline on* attributes`
+
+**Проблема**: несмотря на DOMPurify, в очищенном HTML оставались встроенные обработчики (`onerror`, `onload`, …) → CSP блокировал «Executing inline event handler».
+
+**Исправление**:
+- `extractor.ts`: добавлена функция `stripInlineHandlers(html)` — парсинг через `DOMParser`, проход по всем элементам, удаление каждого атрибута, имя которого начинается с `on` (с учётом регистра). `extractCleanHtml` возвращает результат **после** этого прохода (и для ветки Readability, и для fallback).
+- `pdf.ts`: перед вставкой в скрытый `div` HTML дополнительно прогоняется через `stripInlineHandlers` (защита на всякий случай, если что-то проскочило).
+- `pdf.ts`: в `toJpeg` добавлены `cacheBust: true` и `imagePlaceholder: ""` — внешние картинки подгружаются для визуальной проверки (до замены на локальные в Этапе 5).
+
+**Проверка**: lint + tsc + build чисто; CSP-ошибок в консоли нет; PDF с читаемым текстом и картинками (ручная проверка).
