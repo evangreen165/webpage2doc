@@ -165,3 +165,17 @@
 - `pdf.ts` CSS: добавлено `img, figure, p, h1–h6, blockquote { page-break-inside: avoid; break-inside: avoid }` — блоки не разрываются (html-to-image может учитывать правила при расчёте высоты).
 
 **Проверка**: lint + tsc + build чисто; CSP-ошибок нет; разрывы страниц без разрезания блоков (ручная проверка).
+
+## Исправление 9: предварительный парсинг DOMParser — ноль CSP-ошибок
+Коммит: `fix(csp): pre-parse html with domparser to guarantee zero csp errors`
+
+**Проблема**: при `div.innerHTML = html` / `srcDoc={html}` браузер парсит строку и фиксирует инлайн-обработчики `on*` ещё до того, как мы их удаляем.
+
+**Исправление**:
+- Отказ от прямой вставки сырой HTML-строки в DOM.
+- `stripInlineHandlers(html)` (extractor.ts) теперь: `DOMParser.parseFromString` → удаление всех `on*`-атрибутов из DOM-узлов → удаление `script`/`noscript` → только затем берётся `doc.body.innerHTML` — безопасная строка.
+- `pdf.ts`: в скрытый `div` вставляется только результат `stripInlineHandlers(bodyHtmlOf(html))`; прямого парсинга `on*` браузером не происходит.
+- `PreviewPane.tsx`: `srcDoc` получает `DOMPurify.sanitize(stripInlineHandlers(html))` — очистка на уровне DOM-узлов до вставки.
+- CSS-правила `page-break-inside` удалены из `pdf.ts` (не работают при нарезке скриншота).
+
+**Проверка**: lint + tsc + build чисто; CSP-ошибок нет в консоли (ручная проверка).

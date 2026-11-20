@@ -1,10 +1,9 @@
 import { toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
-import { stripInlineHandlers, stripOnAttributes } from "../extractor";
+import { stripInlineHandlers } from "../extractor";
 
 const BASE_STYLE = `
 img { max-width: 100%; height: auto; }
-img, figure, p, h1, h2, h3, h4, h5, h6, blockquote { page-break-inside: avoid; break-inside: avoid; }
 table { border-collapse: collapse; width: 100%; }
 th, td { border: 1px solid #444444; padding: 4pt; text-align: left; }
 blockquote { margin: 1em 2em; font-style: italic; }
@@ -28,8 +27,8 @@ export async function renderPdf(html: string): Promise<Blob> {
   host.style.padding = "20px";
   host.style.color = "black";
   host.style.fontFamily = "Arial, sans-serif";
-  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${stripInlineHandlers(bodyHtmlOf(html))}`;
-  stripOnAttributes(host);
+  const cleanHtml = stripInlineHandlers(bodyHtmlOf(html));
+  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${cleanHtml}`;
   document.body.appendChild(host);
 
   try {

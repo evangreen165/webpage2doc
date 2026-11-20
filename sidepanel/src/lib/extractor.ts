@@ -55,6 +55,7 @@ export function stripOnAttributes(root: ParentNode): void {
 export function stripInlineHandlers(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   stripOnAttributes(doc);
+  doc.querySelectorAll("script, noscript").forEach((el) => el.remove());
   return doc.body.innerHTML;
 }
 
