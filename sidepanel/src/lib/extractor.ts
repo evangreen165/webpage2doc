@@ -1,4 +1,5 @@
 import { Readability } from "@mozilla/readability";
+import DOMPurify from "dompurify";
 import type { Snapshot } from "./types";
 
 export type ExtractionResult = {
@@ -9,6 +10,11 @@ export type ExtractionResult = {
 };
 
 const LAZY_ATTRS = ["data-src", "data-original", "data-lazy-src"];
+
+const PURIFY_CONFIG = {
+  FORBID_TAGS: ["style", "script"],
+  FORBID_ATTR: ["onerror", "onload", "onclick"],
+};
 
 function promoteLazyImages(doc: Document): void {
   doc.querySelectorAll("img").forEach((img) => {
@@ -32,23 +38,6 @@ function promoteLazyImages(doc: Document): void {
   });
 }
 
-function sanitize(root: ParentNode): void {
-  root.querySelectorAll("script, style, noscript, template, link, meta").forEach((el) => el.remove());
-  root.querySelectorAll("*").forEach((el) => {
-    for (const attr of [...el.attributes]) {
-      if (attr.name.toLowerCase().startsWith("on")) {
-        el.removeAttribute(attr.name);
-      }
-    }
-    for (const attrName of ["href", "src", "action", "xlink:href"]) {
-      const value = el.getAttribute(attrName);
-      if (value && /^\s*(?:javascript|vbscript|data:text\/html)\s*:/i.test(value)) {
-        el.removeAttribute(attrName);
-      }
-    }
-  });
-}
-
 function wrapHtml(bodyHtml: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>${bodyHtml}</body></html>`;
 }
@@ -60,19 +49,18 @@ export function extractCleanHtml(snapshot: Pick<Snapshot, "html">): ExtractionRe
   const article = new Readability(doc.cloneNode(true) as Document).parse();
 
   if (article && article.content) {
-    const contentDoc = new DOMParser().parseFromString(article.content, "text/html");
-    sanitize(contentDoc);
+    const clean = DOMPurify.sanitize(article.content, PURIFY_CONFIG);
     return {
-      html: wrapHtml(contentDoc.body?.innerHTML ?? ""),
+      html: wrapHtml(clean),
       title: article.title,
       usedFallback: false,
       warnings: [],
     };
   }
 
-  sanitize(doc);
+  const clean = DOMPurify.sanitize(doc.body?.innerHTML ?? "", PURIFY_CONFIG);
   return {
-    html: wrapHtml(doc.body?.innerHTML ?? ""),
+    html: wrapHtml(clean),
     usedFallback: true,
     warnings: ["partial_content"],
   };

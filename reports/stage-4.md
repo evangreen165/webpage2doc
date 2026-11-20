@@ -73,3 +73,19 @@
 - После рендера iframe удаляется (`iframe.remove()`), возвращается `pdf.output("blob")`.
 
 **Проверка**: lint + tsc + build чисто; PDF с целыми изображениями на границах страниц; без CSP-ошибок в консоли (ручная проверка).
+
+## Исправление 3: DOMPurify + скрытый div вместо iframe
+Коммит: `fix(render): use DOMPurify and hidden div for stable jsPDF generation`
+
+**Проблемы предыдущего решения**:
+- Текст в PDF превращался в «кракозябры», картинки накладывались — iframe-изоляция ломала рендер шрифтов/layout.
+- Ошибки CSP остались: самописный санитайзер пропускал inline-события.
+
+**Исправление**:
+- Установлены `dompurify@3.4.18` (+ `@types/dompurify`).
+- `extractor.ts`: самописная санитизация заменена на `DOMPurify.sanitize(html, { FORBID_TAGS: ['style','script'], FORBID_ATTR: ['onerror','onload','onclick'] })` — гарантированно удаляет все inline-обработчики (`on*`), `style` и `script`; применяется и к результату Readability, и к fallback.
+- `pdf.ts`: `<iframe>` убран. Скрытый `div` (`position: fixed; left: 0; top: 0; z-index: -9999; opacity: 0; pointer-events: none; width: 800px; background: white`) вставляется в `document.body`; внутрь кладётся очищенный HTML без `<html>/<body>` с базовыми стилями шрифта (`body { font-family: Arial, sans-serif; color: black; line-height: 1.5 }`, `img { max-width: 100%; height: auto }` и page-break-правилами).
+- Рендер: `await pdf.html(div, { html2canvas: { scale: 2, useCORS: true, logging: false }, autoPaging: 'text', margin: [10,10,10,10] })`.
+- После рендера `div.remove()`; возвращается `pdf.output("blob")`.
+
+**Проверка**: lint + tsc + build чисто; PDF без кракозябр и наложений, изображения не режутся; в консоли нет CSP-ошибок (ручная проверка).

@@ -12,9 +12,11 @@
   },
   "dependencies": {
     "@mozilla/readability": "^0.5.0",
+    "@types/dompurify": "^3.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx": "^9.0.2",
+    "dompurify": "^3.4.18",
     "html2canvas": "^1.4.1",
     "i18next": "^23.16.8",
     "jspdf": "^4.2.1",
