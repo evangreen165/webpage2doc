@@ -1,16 +1,17 @@
+import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
 const BASE_STYLE = `
-body { font-family: Arial, sans-serif; color: black; line-height: 1.5; }
 img { max-width: 100%; height: auto; }
-h1, h2, h3, h4, h5, h6 { page-break-after: avoid; break-after: avoid; }
-img, figure, p, table, tr { page-break-inside: avoid; break-inside: avoid; }
 table { border-collapse: collapse; width: 100%; }
 th, td { border: 1px solid #444444; padding: 4pt; text-align: left; }
 blockquote { margin: 1em 2em; font-style: italic; }
 pre { white-space: pre-wrap; font-family: "Courier New", monospace; }
 a { color: #111111; }
 `;
+
+const PAGE_WIDTH_MM = 210;
+const PAGE_HEIGHT_MM = 297;
 
 function bodyHtmlOf(fullHtml: string): string {
   const doc = new DOMParser().parseFromString(fullHtml, "text/html");
@@ -27,28 +28,44 @@ export async function renderPdf(html: string): Promise<Blob> {
   host.style.opacity = "0.01";
   host.style.pointerEvents = "none";
   host.style.background = "white";
+  host.style.fontFamily = "Arial, sans-serif";
+  host.style.color = "black";
+  host.style.fontSize = "14px";
+  host.style.lineHeight = "1.5";
   host.innerHTML = `<style>${BASE_STYLE}</style>${bodyHtmlOf(html)}`;
   document.body.appendChild(host);
 
   try {
-    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
-    await pdf.html(host, {
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        onclone: (clonedDoc) => {
-          clonedDoc.querySelectorAll("style").forEach((style) => {
-            if (style.innerHTML.includes("eval") || style.innerHTML.includes("javascript:")) {
-              style.remove();
+    const canvas = await html2canvas(host, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      onclone: (clonedDoc) => {
+        clonedDoc.querySelectorAll("*").forEach((el) => {
+          Array.from(el.attributes).forEach((attr) => {
+            if (attr.name.startsWith("on")) {
+              el.removeAttribute(attr.name);
             }
           });
-        },
+        });
       },
-      autoPaging: "text",
-      margin: [10, 10, 10, 10],
-      windowWidth: 800,
     });
+
+    const pdf = new jsPDF("p", "mm", "a4");
+    const imgWidth = PAGE_WIDTH_MM;
+    const pageHeight = PAGE_HEIGHT_MM;
+    let heightLeft = (canvas.height * imgWidth) / canvas.width;
+
+    pdf.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, 0, imgWidth, heightLeft);
+
+    heightLeft -= pageHeight;
+    let position = 0;
+    while (heightLeft > 0) {
+      position -= pageHeight;
+      pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, position, imgWidth, heightLeft + pageHeight);
+      heightLeft -= pageHeight;
+    }
 
     return pdf.output("blob");
   } finally {

@@ -104,3 +104,19 @@
 - Защита текстовых рендеров: в `markdown.ts` и `docx.ts` добавлен пропуск тегов `style`/`script`/`noscript`/`template`, чтобы CSS не протекал в MD/DOCX.
 
 **Проверка**: lint + tsc + build чисто; PDF непустой, страницы корректные; CSP-ошибок нет (ручная проверка).
+
+## Исправление 5: ручной html2canvas + jsPDF без jsPDF.html()
+Коммит: `fix(render): manual html2canvas+jspdf rendering with strict csp cleaning`
+
+**Проблема**: `jsPDF.html()` и вложенный html2canvas клонировали документ, теряя кодировку шрифта (кракозябры) и копируя инлайн-обработчики `on*`, которые блокирует Chrome (CSP).
+
+**Исправление** (`sidepanel/src/lib/render/pdf.ts`):
+- `jsPDF.html()` убран; рендер вручную:
+  1. Скрытый `div` в `document.body`: `position: absolute; top: 0; left: 0; width: 800px; z-index: 9999; opacity: 0.01; pointer-events: none; background: white; font-family: Arial, sans-serif; color: black; font-size: 14px; line-height: 1.5`; внутрь — очищенный HTML (текст не в `<script>` — DOMPurify их удаляет).
+  2. `await html2canvas(div, { scale: 2, useCORS: true, logging: false, onclone })`.
+  3. `onclone` — жёсткая очистка: у всех элементов удаляются все атрибуты, начинающиеся с `on` (`onclick`, `onload`, …).
+  4. `new jsPDF('p', 'mm', 'a4')`; `imgWidth = 210`, `pageHeight = 297`, `heightLeft = canvas.height * imgWidth / canvas.width`; `addImage(canvas.toDataURL('image/jpeg', 1.0), 'JPEG', 0, 0, imgWidth, heightLeft)`.
+  5. Цикл страниц: `heightLeft -= pageHeight`; пока `> 0` — `position -= pageHeight`, `addPage()`, `addImage(..., 0, position, imgWidth, heightLeft + pageHeight)`.
+  6. `pdf.output('blob')`, `div.remove()`.
+
+**Проверка**: lint + tsc + build чисто; PDF непустой, без кракозябр; CSP-ошибок нет; страницы режутся без разрыва картинок (ручная проверка).
