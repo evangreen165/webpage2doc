@@ -10,6 +10,11 @@ export function renderMarkdown(html: string): string {
   });
   turndown.use(gfm);
 
+  turndown.addRule("removeStyle", {
+    filter: ["style", "script", "noscript", "template"],
+    replacement: () => "",
+  });
+
   turndown.addRule("mediaLink", {
     filter: (node) => {
       const tag = node.nodeName.toLowerCase();

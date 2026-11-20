@@ -12,8 +12,8 @@ export type ExtractionResult = {
 const LAZY_ATTRS = ["data-src", "data-original", "data-lazy-src"];
 
 const PURIFY_CONFIG = {
-  FORBID_TAGS: ["style", "script"],
-  FORBID_ATTR: ["onerror", "onload", "onclick"],
+  ADD_TAGS: ["style", "table", "thead", "tbody", "tr", "th", "td", "img"],
+  ADD_ATTR: ["style", "target"],
 };
 
 function promoteLazyImages(doc: Document): void {

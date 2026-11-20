@@ -89,3 +89,18 @@
 - После рендера `div.remove()`; возвращается `pdf.output("blob")`.
 
 **Проверка**: lint + tsc + build чисто; PDF без кракозябр и наложений, изображения не режутся; в консоли нет CSP-ошибок (ручная проверка).
+
+## Исправление 4: прозрачность div и санитизация стилей для CSP
+Коммит: `fix(render): fix hidden div opacity for jsPDF and sanitize styles for CSP`
+
+**Проблемы**:
+- `html2canvas` внутри `jsPDF.html()` игнорирует элементы с `opacity: 0` → пустой PDF.
+- `html2canvas` обрабатывал инлайн-стили/скрипты → ошибки CSP.
+
+**Исправление**:
+- `pdf.ts`, скрытый div: `position: absolute; top: 0; left: 0; width: 800px; z-index: 9999; opacity: 0.01; pointer-events: none; background: white` — `opacity: 0.01` (не 0), положительный `z-index`, чтобы браузер отрисовал элемент.
+- `extractor.ts`, DOMPurify: `DOMPurify.sanitize(html, { ADD_TAGS: ['style','table','thead','tbody','tr','th','td','img'], ADD_ATTR: ['style','target'] })` — `<style>` сохраняется, `<script>` и все `on*`-атрибуты удаляются по умолчанию DOMPurify.
+- `pdf.ts`, рендер: `await pdf.html(div, { html2canvas: { scale: 2, useCORS: true, logging: false, onclone: ... }, autoPaging: 'text', margin: [10,10,10,10], windowWidth: 800 })`; `onclone` удаляет `<style>`, содержащие `eval`/`javascript:` — устранение CSP-ошибок от html2canvas.
+- Защита текстовых рендеров: в `markdown.ts` и `docx.ts` добавлен пропуск тегов `style`/`script`/`noscript`/`template`, чтобы CSS не протекал в MD/DOCX.
+
+**Проверка**: lint + tsc + build чисто; PDF непустой, страницы корректные; CSP-ошибок нет (ручная проверка).

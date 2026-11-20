@@ -104,6 +104,9 @@ function walkBlocks(container: Node, out: Block[]): void {
       );
       return;
     }
+    if (tag === "style" || tag === "script" || tag === "noscript" || tag === "template") {
+      return;
+    }
     if (tag === "p") {
       out.push(new Paragraph({ children: inlineRuns(el), spacing: { after: 120 } }));
       return;

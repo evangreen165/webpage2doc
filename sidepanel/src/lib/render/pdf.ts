@@ -19,13 +19,13 @@ function bodyHtmlOf(fullHtml: string): string {
 
 export async function renderPdf(html: string): Promise<Blob> {
   const host = document.createElement("div");
-  host.style.position = "fixed";
-  host.style.left = "0";
+  host.style.position = "absolute";
   host.style.top = "0";
-  host.style.zIndex = "-9999";
-  host.style.opacity = "0";
-  host.style.pointerEvents = "none";
+  host.style.left = "0";
   host.style.width = "800px";
+  host.style.zIndex = "9999";
+  host.style.opacity = "0.01";
+  host.style.pointerEvents = "none";
   host.style.background = "white";
   host.innerHTML = `<style>${BASE_STYLE}</style>${bodyHtmlOf(html)}`;
   document.body.appendChild(host);
@@ -33,9 +33,21 @@ export async function renderPdf(html: string): Promise<Blob> {
   try {
     const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
     await pdf.html(host, {
-      html2canvas: { scale: 2, useCORS: true, logging: false },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll("style").forEach((style) => {
+            if (style.innerHTML.includes("eval") || style.innerHTML.includes("javascript:")) {
+              style.remove();
+            }
+          });
+        },
+      },
       autoPaging: "text",
       margin: [10, 10, 10, 10],
+      windowWidth: 800,
     });
 
     return pdf.output("blob");
