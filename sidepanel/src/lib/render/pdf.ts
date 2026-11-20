@@ -1,5 +1,6 @@
 import { toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
+import { stripInlineHandlers } from "../extractor";
 
 const BASE_STYLE = `
 img { max-width: 100%; height: auto; }
@@ -26,7 +27,7 @@ export async function renderPdf(html: string): Promise<Blob> {
   host.style.padding = "20px";
   host.style.color = "black";
   host.style.fontFamily = "Arial, sans-serif";
-  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${bodyHtmlOf(html)}`;
+  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${stripInlineHandlers(bodyHtmlOf(html))}`;
   document.body.appendChild(host);
 
   try {

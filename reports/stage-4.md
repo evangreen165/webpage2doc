@@ -193,3 +193,16 @@
 > Замечание: `unsafe-eval`/`unsafe-inline` в MV3 не пройдут ревью Chrome Web Store; для Load unpacked это допустимо (публикация в Store вне scope плана). Перед публикацией CSP нужно вернуть к строгому виду.
 
 **Проверка**: lint + tsc + build чисто; CSP-ошибок нет в консоли; PDF генерируется корректно (ручная проверка).
+
+## Исправление 11: откат CSP из манифеста, восстановление жёсткой очистки
+Коммит: `fix(csp): revert manifest and restore strict inline handler stripping`
+
+**Проблема**: `unsafe-inline`/`unsafe-eval` в `content_security_policy` категорически запрещены Chrome для MV3 — расширение перестало загружаться.
+
+**Исправление**:
+- `manifest.json`: блок `content_security_policy` полностью удалён — стандартная конфигурация MV3, расширение снова загружается.
+- `extractor.ts`: восстановлены `stripOnAttributes(root)` и `stripInlineHandlers(html)` (DOMParser → удаление всех `on*`-атрибутов из DOM-узлов → удаление `script`/`noscript` → `doc.body.innerHTML`).
+- `pdf.ts`: перед вставкой в скрытый `div` HTML прогоняется через `stripInlineHandlers`; рендер через `html-to-image` (`cacheBust: true` сохранён). Ошибки CSP от самой библиотеки в консоли игнорируем до Этапа 5 — важно получить PDF с текстом.
+- `PreviewPane.tsx`: `srcDoc` = `DOMPurify.sanitize(stripInlineHandlers(html))`.
+
+**Проверка**: lint + tsc + build чисто; расширение загружается в Chrome; PDF с текстом генерируется (ручная проверка).

@@ -42,6 +42,23 @@ function wrapHtml(bodyHtml: string): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head><body>${bodyHtml}</body></html>`;
 }
 
+export function stripOnAttributes(root: ParentNode): void {
+  root.querySelectorAll("*").forEach((el) => {
+    for (const attr of [...el.attributes]) {
+      if (attr.name.toLowerCase().startsWith("on")) {
+        el.removeAttribute(attr.name);
+      }
+    }
+  });
+}
+
+export function stripInlineHandlers(html: string): string {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  stripOnAttributes(doc);
+  doc.querySelectorAll("script, noscript").forEach((el) => el.remove());
+  return doc.body.innerHTML;
+}
+
 export function extractCleanHtml(snapshot: Pick<Snapshot, "html">): ExtractionResult {
   const doc = new DOMParser().parseFromString(snapshot.html, "text/html");
   promoteLazyImages(doc);
