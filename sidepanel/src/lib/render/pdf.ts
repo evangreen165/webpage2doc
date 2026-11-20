@@ -1,4 +1,4 @@
-import html2canvas from "html2canvas";
+import { toJpeg } from "html-to-image";
 import { jsPDF } from "jspdf";
 
 const BASE_STYLE = `
@@ -9,9 +9,6 @@ blockquote { margin: 1em 2em; font-style: italic; }
 pre { white-space: pre-wrap; font-family: "Courier New", monospace; }
 a { color: #111111; }
 `;
-
-const PAGE_WIDTH_MM = 210;
-const PAGE_HEIGHT_MM = 297;
 
 function bodyHtmlOf(fullHtml: string): string {
   const doc = new DOMParser().parseFromString(fullHtml, "text/html");
@@ -24,46 +21,34 @@ export async function renderPdf(html: string): Promise<Blob> {
   host.style.top = "0";
   host.style.left = "0";
   host.style.width = "800px";
-  host.style.zIndex = "9999";
-  host.style.opacity = "0.01";
-  host.style.pointerEvents = "none";
+  host.style.zIndex = "99999";
   host.style.background = "white";
-  host.style.fontFamily = "Arial, sans-serif";
+  host.style.padding = "20px";
   host.style.color = "black";
-  host.style.fontSize = "14px";
-  host.style.lineHeight = "1.5";
-  host.innerHTML = `<style>${BASE_STYLE}</style>${bodyHtmlOf(html)}`;
+  host.style.fontFamily = "Arial, sans-serif";
+  host.innerHTML = `<meta charset="utf-8"><style>${BASE_STYLE}</style>${bodyHtmlOf(html)}`;
   document.body.appendChild(host);
 
   try {
-    const canvas = await html2canvas(host, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      onclone: (clonedDoc) => {
-        clonedDoc.querySelectorAll("*").forEach((el) => {
-          Array.from(el.attributes).forEach((attr) => {
-            if (attr.name.startsWith("on")) {
-              el.removeAttribute(attr.name);
-            }
-          });
-        });
-      },
-    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const dataUrl = await toJpeg(host, { quality: 0.95, backgroundColor: "#ffffff" });
 
     const pdf = new jsPDF("p", "mm", "a4");
-    const imgWidth = PAGE_WIDTH_MM;
-    const pageHeight = PAGE_HEIGHT_MM;
-    let heightLeft = (canvas.height * imgWidth) / canvas.width;
+    const imgProps = pdf.getImageProperties(dataUrl);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-    pdf.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, 0, imgWidth, heightLeft);
-
+    let heightLeft = imgHeight;
+    pdf.addImage(dataUrl, "JPEG", 0, 0, pdfWidth, imgHeight);
     heightLeft -= pageHeight;
+
     let position = 0;
     while (heightLeft > 0) {
       position -= pageHeight;
       pdf.addPage();
-      pdf.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, position, imgWidth, heightLeft + pageHeight);
+      pdf.addImage(dataUrl, "JPEG", 0, position, pdfWidth, imgHeight);
       heightLeft -= pageHeight;
     }
 

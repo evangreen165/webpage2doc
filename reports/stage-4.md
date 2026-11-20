@@ -120,3 +120,21 @@
   6. `pdf.output('blob')`, `div.remove()`.
 
 **Проверка**: lint + tsc + build чисто; PDF непустой, без кракозябр; CSP-ошибок нет; страницы режутся без разрыва картинок (ручная проверка).
+
+## Исправление 6: капитальная замена html2canvas → html-to-image (SVG-рендер)
+Коммит: `fix(render): replace html2canvas with html-to-image and fix utf8 charset`
+
+**Проблема**: html2canvas несовместим с CSP расширений и не рендерит скрытые элементы — 5 предыдущих попыток давали пустой PDF, кракозябры и CSP-ошибки. CSP мог течь и из PreviewPane (iframe srcDoc).
+
+**Исправление**:
+- `html2canvas` удалён из зависимостей, установлен `html-to-image@1.11.13` (рендер через SVG foreignObject — безопасен для CSP, корректно рендерит шрифты).
+- `pdf.ts`:
+  - скрытый `div` (`position: absolute; top: 0; left: 0; width: 800px; z-index: 99999; background: white; padding: 20px; color: black; font-family: Arial, sans-serif`);
+  - внутрь первым элементом вставляется `<meta charset="utf-8">`, затем очищенный HTML — устраняет кракозябры;
+  - ожидание загрузки ресурсов (`await new Promise(r => setTimeout(r, 500))`);
+  - снимок: `toJpeg(div, { quality: 0.95, backgroundColor: '#ffffff' })`;
+  - `jsPDF('p','mm','a4')`: `getImageProperties(dataUrl)` → `pdfWidth`, `imgHeight`, стандартный цикл нарезки страниц (`addPage()` + отрицательный `position`);
+  - после рендера `div.remove()`.
+- `PreviewPane.tsx`: HTML перед `srcDoc` прогоняется через `DOMPurify.sanitize(html, { FORBID_TAGS: ['script','style'], FORBID_ATTR: ['onerror','onload','onclick'] })` — любые inline-события гарантированно удаляются из превью.
+
+**Проверка**: lint + tsc + build чисто; PDF непустой, кириллица корректная; CSP-ошибок нет (ручная проверка).
