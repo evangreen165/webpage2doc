@@ -58,3 +58,18 @@
 - Инлайн-скрипты отсутствуют: санитайзер экстрактора удаляет `script`/`style`/`on*`/`javascript:` до рендера; в обёртку печати добавляется только `<style>`.
 
 **Проверка**: lint + tsc + build чисто; в консоли панели нет ошибок CSP; PDF генерируется (ручная проверка).
+
+## Исправление 2: jsPDF.html + iframe-изоляция (пагинация и CSP)
+Коммит: `fix(render): use jsPDF.html for proper pagination and iframe to bypass CSP`
+
+**Проблемы**:
+1. Ручная нарезка канваса резала изображения пополам на границах страниц.
+2. Вставка скрытого `div` с HTML напрямую в `document.body` панели вызывала ошибки CSP (inline event handler).
+
+**Исправление** (`sidepanel/src/lib/render/pdf.ts`):
+- HTML больше не вставляется в `document.body` панели: создаётся `<iframe sandbox="allow-same-origin">` (`position: absolute; left: -9999px; width: 800px; height: 1000px; border: none`), контент записывается в `iframe.contentDocument.body` — стили и скрипты изолированы от панели, ошибки CSP исчезают.
+- Пагинация через встроенный `jsPDF.html(body, { html2canvas: { scale: 2 }, autoPaging: "text", margin: 10, windowWidth: 800 })` — блоки (абзацы, изображения, таблицы) переносятся целиком.
+- В print-CSS добавлены `img { page-break-inside: avoid; max-width: 100% }` и `figure, p { page-break-inside: avoid }` — движок не разрывает картинки и абзацы.
+- После рендера iframe удаляется (`iframe.remove()`), возвращается `pdf.output("blob")`.
+
+**Проверка**: lint + tsc + build чисто; PDF с целыми изображениями на границах страниц; без CSP-ошибок в консоли (ручная проверка).
