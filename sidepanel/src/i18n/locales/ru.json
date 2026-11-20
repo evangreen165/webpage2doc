@@ -11,10 +11,18 @@
     "switch": "Переключить язык"
   },
   "actions": {
-    "generate": "Сгенерировать"
+    "generate": "Сгенерировать",
+    "download": "Скачать"
   },
   "status": {
-    "collecting": "Собираем страницу…"
+    "collecting": "Собираем страницу…",
+    "rendering": "Генерируем документ…"
+  },
+  "format": {
+    "label": "Формат:",
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "md": "Markdown"
   },
   "results": {
     "found": "Найдено: {{images}} изображений, {{videos}} видео",

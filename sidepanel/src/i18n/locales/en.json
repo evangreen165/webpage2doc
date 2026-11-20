@@ -11,10 +11,18 @@
     "switch": "Switch language"
   },
   "actions": {
-    "generate": "Generate"
+    "generate": "Generate",
+    "download": "Download"
   },
   "status": {
-    "collecting": "Collecting the page…"
+    "collecting": "Collecting the page…",
+    "rendering": "Rendering the document…"
+  },
+  "format": {
+    "label": "Format:",
+    "pdf": "PDF",
+    "docx": "DOCX",
+    "md": "Markdown"
   },
   "results": {
     "found": "Found: {{images}} images, {{videos}} videos",

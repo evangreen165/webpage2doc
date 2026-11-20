@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { FileDown, Languages, Moon, Sun } from "lucide-react";
+import { Download, FileDown, Languages, Moon, Sun } from "lucide-react";
 import { collectFromTab } from "./lib/bridge";
 import { extractCleanHtml, type ExtractionResult } from "./lib/extractor";
 import type { Snapshot } from "./lib/types";
 import { PreviewPane } from "./components/PreviewPane";
+import { renderMarkdown } from "./lib/render/markdown";
+import { renderDocx } from "./lib/render/docx";
+import { renderPdf } from "./lib/render/pdf";
+import { slugify } from "./lib/format";
 
 type Theme = "light" | "dark";
 type JobStatus = "idle" | "collecting" | "done" | "error";
+type Format = "pdf" | "docx" | "md";
 
 function useTheme(): [Theme, () => void] {
   const [theme, setTheme] = useState<Theme>(() => {
@@ -72,6 +77,8 @@ export default function App() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [clean, setClean] = useState<ExtractionResult | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [format, setFormat] = useState<Format>("pdf");
+  const [rendering, setRendering] = useState(false);
 
   const generate = async () => {
     setStatus("collecting");
@@ -97,6 +104,32 @@ export default function App() {
     } catch {
       setErrorCode("GENERIC");
       setStatus("error");
+    }
+  };
+
+  const download = async () => {
+    if (!clean || !snapshot) return;
+    setRendering(true);
+    try {
+      let blob: Blob;
+      if (format === "md") {
+        blob = new Blob([renderMarkdown(clean.html)], { type: "text/markdown;charset=utf-8" });
+      } else if (format === "docx") {
+        blob = await renderDocx(clean.html);
+      } else {
+        blob = await renderPdf(clean.html);
+      }
+      const url = URL.createObjectURL(blob);
+      await chrome.downloads.download({
+        url,
+        filename: `webpage2doc/${slugify(snapshot.title)}.${format}`,
+        saveAs: true,
+      });
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setErrorCode("GENERIC");
+    } finally {
+      setRendering(false);
     }
   };
 
@@ -129,6 +162,30 @@ export default function App() {
               <p className="text-sm text-muted-foreground">
                 {t("results.found", { images: snapshot.images.length, videos: snapshot.videos.length })}
               </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 text-xs font-medium">
+                  {t("format.label")}
+                  <select
+                    value={format}
+                    onChange={(event) => setFormat(event.target.value as Format)}
+                    className="rounded-md border bg-background px-2 py-1.5 text-sm"
+                  >
+                    <option value="pdf">{t("format.pdf")}</option>
+                    <option value="docx">{t("format.docx")}</option>
+                    <option value="md">{t("format.md")}</option>
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  onClick={download}
+                  disabled={rendering}
+                  className="flex items-center gap-2 rounded-md bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  <Download className="h-4 w-4" />
+                  {t("actions.download")}
+                </button>
+              </div>
+              {rendering && <p className="text-sm text-muted-foreground">{t("status.rendering")}</p>}
               {(snapshot.warnings.length > 0 || clean.usedFallback) && (
                 <div className="flex flex-col gap-1 rounded-md border p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide">{t("results.warnings")}</p>
