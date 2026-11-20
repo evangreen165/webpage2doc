@@ -69,3 +69,19 @@
 - `pdf.ts`: `src` подменяется на сохранённый Base64 по `data-w2d-id`; перед `toJpeg` добавлены `await document.fonts.ready` + `await new Promise(r => setTimeout(r, 1000))` (DOM успевает отрисовать Base64), плюс ожидание `img.complete`/`onload`/`onerror`.
 
 **Проверка**: lint + tsc + build чисто; картинки в PDF/DOCX не битые (ручная проверка).
+
+## Исправление 3: пуленепробиваемый DOCX (fetch), защита от зависания PDF, финальная зачистка CSP
+Коммит: `fix(render): bulletproof docx arraybuffer, prevent pdf hang, final csp strip`
+
+**Проблемы**: PDF зависал (блокирующая задержка 1000 мс), DOCX пустой, CSP-ошибки оставались.
+
+**Исправление**:
+- `docx.ts`: `atob()`/`charCodeAt()` полностью удалены; `base64ToArrayBuffer(dataUrl)` через `await fetch(dataUrl).arrayBuffer()` → `Uint8Array` — этот массив передаётся в `ImageRun` (после конвертации в PNG через canvas).
+- `pdf.ts`:
+  - убрана блокирующая задержка `setTimeout(1000)`;
+  - загрузка картинок с жёстким таймаутом 2 с на каждую (`setTimeout(resolve, 2000)`) — если не загрузилась, идём дальше;
+  - перед `toJpeg` финальная зачистка: у всех элементов скрытого `div` удаляются атрибуты `on*`;
+  - `console.log("Найдено картинок для вставки:", images.length)` — контроль `data-w2d-id`.
+- `sidepanel/index.html` проверен: единственный `<script>` — module-вход `/src/main.tsx` (внешний `src`, разрешён CSP `'self'`), инлайн-обработчиков нет.
+
+**Проверка**: lint + tsc + build чисто; PDF не зависает; DOCX с картинками; CSP-ошибок нет (ручная проверка).

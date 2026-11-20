@@ -24,7 +24,9 @@ const HEADING_LEVELS: Record<string, (typeof HeadingLevel)[keyof typeof HeadingL
   h6: HeadingLevel.HEADING_6,
 };
 
-type PreparedImage = { pngDataUrl: string; width: number; height: number };
+type PreparedImage = { bytes: Uint8Array; width: number; height: number };
+
+type PngImage = { pngDataUrl: string; width: number; height: number };
 
 type InlineCtx = {
   bold?: boolean;
@@ -34,10 +36,10 @@ type InlineCtx = {
 
 const MAX_IMAGE_WIDTH_PX = 640;
 
-function dataUrlToUint8Array(dataUrl: string): Uint8Array {
-  const base64 = dataUrl.split(",")[1] ?? dataUrl;
-  const binary = atob(base64);
-  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+async function base64ToArrayBuffer(dataUrl: string): Promise<Uint8Array> {
+  const response = await fetch(dataUrl);
+  const buffer = await response.arrayBuffer();
+  return new Uint8Array(buffer);
 }
 
 async function loadImage(dataUrl: string): Promise<HTMLImageElement> {
@@ -49,7 +51,7 @@ async function loadImage(dataUrl: string): Promise<HTMLImageElement> {
   });
 }
 
-async function convertToPng(base64: string): Promise<PreparedImage> {
+async function convertToPng(base64: string): Promise<PngImage> {
   const img = await loadImage(base64);
   const canvas = document.createElement("canvas");
   canvas.width = img.naturalWidth;
@@ -93,7 +95,7 @@ function inlineRuns(node: Node, ctx: InlineCtx): (TextRun | ImageRun)[] {
         runs.push(
           new ImageRun({
             type: "png",
-            data: dataUrlToUint8Array(prepared.pngDataUrl),
+            data: prepared.bytes,
             transformation: { width, height },
           }),
         );
@@ -242,7 +244,12 @@ export async function renderDocx(html: string, images: DownloadedImage[]): Promi
       if (!downloaded) return;
       seen.add(id);
       try {
-        preparedById.set(id, await convertToPng(downloaded.base64));
+        const png = await convertToPng(downloaded.base64);
+        preparedById.set(id, {
+          bytes: await base64ToArrayBuffer(png.pngDataUrl),
+          width: png.width,
+          height: png.height,
+        });
       } catch {
         // conversion failed → fall back to placeholder
       }

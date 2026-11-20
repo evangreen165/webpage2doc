@@ -41,17 +41,29 @@ export async function renderPdf(html: string, images: DownloadedImage[]): Promis
 
   try {
     const images = Array.from(host.querySelectorAll("img"));
-    await Promise.all(
-      images.map((img) => {
-        if (img.complete) return Promise.resolve();
-        return new Promise<void>((resolve) => {
+    console.log("Найдено картинок для вставки:", images.length);
+    const imagePromises = images.map(
+      (img) =>
+        new Promise<void>((resolve) => {
+          if (img.complete) {
+            resolve();
+            return;
+          }
           img.onload = () => resolve();
           img.onerror = () => resolve();
-        });
-      }),
+          setTimeout(resolve, 2000);
+        }),
     );
+    await Promise.all(imagePromises);
     await document.fonts.ready;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    host.querySelectorAll("*").forEach((el) => {
+      for (let i = el.attributes.length - 1; i >= 0; i--) {
+        if (el.attributes[i].name.startsWith("on")) {
+          el.removeAttribute(el.attributes[i].name);
+        }
+      }
+    });
 
     const dataUrl = await toJpeg(host, {
       quality: 0.95,
